@@ -32,11 +32,11 @@ class Grammar(object):
         self.rmTag = [{'tag': 'codeline', 'typed': 'null'}]
         self.aTags = self.mTags + self.oTags + self.rmTag
         self.allData = {
-        			'proto': [],
-        			'codeLine': None,
-        			'workspace': None,
-        			'project': None,
-        			'summary': [],
+                    'proto': [],
+                    'codeLine': 'framework',
+                    'workspace': None,
+                    'project': None,
+                    'summary': [],
         }
         # self.aTags = self.uTags
         self._verify_syntax()
@@ -117,9 +117,9 @@ class Grammar(object):
 
         # Check the relationally mandatory tag is present
         try:
-        	if re.findall(r'RUN_TEST', self.data, re.IGNORECASE) and not re.findall(r'codeline', self.data, re.IGNORECASE):
-        		e = "Can not find CODELINE"
-        		raise SyntaxError(e)
+            if re.findall(r'RUN_TEST', self.data, re.IGNORECASE) and not re.findall(r'codeline', self.data, re.IGNORECASE):
+                e = "Can not find CODELINE"
+                raise SyntaxError(e)
         except SyntaxError as what:
             err = "SyntaxError: %s" % str(what)
             print(err, file=sys.stderr)
@@ -155,94 +155,194 @@ class Grammar(object):
         elif typed == "mono1" or typed == "mono2":
             regex = tag + r"\s*\{(?:\n*\s*(.*?))\}"
             match = re.findall(regex, self.data, re.DOTALL | re.IGNORECASE)
-            entries = match[0].split()
+            try:
+                entries = match[0].split()
+            except IndexError:
+                if tag != r'proto':
+                    return None
             for i in xrange(len(entries)):
-				try:
-					# if not entries[i].endswith(r",") and entries[i + 1] == r",":
-					# 	entries.pop(i + 1)
-					# 	entries[i] += r","
-					# if not entries[i].endswith(r":") and entries[i + 1] == r":":
-					# 	entries.pop(i + 1)
-					# 	entries[i] += r":"
-					if entries[i][-1] not in string.punctuation and entries[i + 1][-1] in string.punctuation:
-						t = entries.pop(i + 1)
-						entries[i] += t
-				except IndexError:
-					pass
+                try:
+                    if not entries[i].endswith(r",") and entries[i + 1] == r",":
+                      entries.pop(i + 1)
+                      entries[i] += r","
+                    if not entries[i].endswith(r":") and entries[i + 1] == r":":
+                      entries.pop(i + 1)
+                      entries[i] += r":"
+                    # if entries[i][-1] not in string.punctuation and entries[i + 1][-1] in string.punctuation:
+                    #     t = entries.pop(i + 1)
+                    #     entries[i] += t
+                except IndexError:
+                    pass
         elif typed == "multi":
-            pass
+            regex = tag + r"\s*\{(?:\n*\s*(.*?))\}"
+            match = re.findall(regex, self.data, re.DOTALL | re.IGNORECASE)
+            try:
+                entries = match[0].split()
+            except IndexError:
+                return None
         return entries
 
     def __is_empty(self, entries, tag):
-    	"""
-    	Check if the tag passed does
-    	have some values in the entry.
-    	If the 'entries' is empty for the 'tag'
-    	it will throw an exception
+        """
+        Check if the tag passed does
+        have some values in the entry.
+        If the 'entries' is empty for the 'tag'
+        it will throw an exception
 
-		:param entries: str (entries for each tag in .automate file)
-    	:param tag: str (any possible tag in .automate file)
+        :param entries: str (entries for each tag in .automate file)
+        :param tag: str (any possible tag in .automate file)
 
-    	:CAUTION: Low level api and not to be used by derived classes
+        :CAUTION: Low level api and not to be used by derived classes
 
-    	:return: None
-    	"""
-    	try:
-    		if not entries:
-    			e = "No entries in %s" % str(tag).upper()
-    			raise AttributeError(e)
-    	except AttributeError as what:
-    		err = "AttributeError: %s" % str(what)
-    		print(err, file=sys.stderr)
-    		sys.exit()
+        :return: None
+        """
+        try:
+            if not entries:
+                e = "No entries in %s" % str(tag).upper()
+                raise AttributeError(e)
+        except AttributeError as what:
+            err = "AttributeError: %s" % str(what)
+            print(err, file=sys.stderr)
+            sys.exit()
 
     def __delimit__(self, entries, delimit, tag):
-    	"""
-    	Fallback magic method for _delimit() method.
+        """
+        Fallback magic method for _delimit() method.
 
-    	It checks if all the 'entries' for a 'tag' 
-    	ends with the 'delimit' mentioned
+        It checks if all the 'entries' for a 'tag'
+        ends with the 'delimit' mentioned
 
-		:param tag: str ('tag' for which entries needed to be found)
-    	:param entries: list (entries for the 'tag' in .automate file)
-    	:param delimit: str (delimit that should be verified)
+        :param tag: str ('tag' for which entries needed to be found)
+        :param entries: list (entries for the 'tag' in .automate file)
+        :param delimit: str (delimit that should be verified)
 
-    	:exception: SyntaxError() if each values in the 'entries'
-    							  doesn't end with the 'delimit'
-    	"""
-    	try:
-    		for each in entries:
-    			if not each.endswith(delimit):
-    				if each[-1].isalpha() or each[-1].isdigit():
-    					e = "Expected %s after %s" % (str(delimit), str(each))
-    				else:
-    					e = "Expected %s instead of %s in %s" % (str(delimit), str(each)[-1], str(each)[0:-1])
-    				raise SyntaxError(e)
-    	except SyntaxError as what:
-    		err = "SyntaxError: %s" % str(what)
-    		print(err, file=sys.stderr)
-    		sys.exit()
-    	else:
-    		print([each.split()[0].split(delimit)[0] for each in entries])
+        :exception: SyntaxError() if each values in the 'entries'
+                                  doesn't end with the 'delimit'
+        """
+        try:
+            for each in entries:
+                if not each.endswith(delimit):
+                    if each[-1].isalpha() or each[-1].isdigit():
+                        e = "Expected %s after '%s' in %s" % (str(delimit), str(each), str(tag).upper())
+                    else:
+                        e = "Expected %s instead of %s in %s" % (str(delimit), str(each)[-1], str(each)[0:-1])
+                    raise SyntaxError(e)
+        except SyntaxError as what:
+            err = "SyntaxError: %s" % str(what)
+            print(err, file=sys.stderr)
+            sys.exit()
+        else:
+            print([each.split()[0].split(delimit)[0] for each in entries])
 
     def _delimit(self):
-    	for each in self.aTags:
-    		entries = self.__core__(each['tag'], each['typed'])
-    		if each['typed'] == 'mono1' or each['typed'] == 'mono2':
-    			self.__is_empty(entries, each['tag'])
+        for each in self.aTags:
+            entries = self.__core__(each['tag'], each['typed'])
+            if entries is None:
+                continue
+            if each['typed'] == 'mono1' or each['typed'] == 'mono2':
+                self.__is_empty(entries, each['tag'])
 
-    		if each['typed'] == 'mono1':
-    			# Because all the mono1 tags are ended with ','
-	    		self.__delimit__(entries, r",", each['tag'])
-	    	elif each['typed'] == 'mono2':
-	    		# Because all the mono2 tags are ended with ':' and  ',' both
-	    		self.__delimit__([entries[i] for i in xrange(len(entries)) if i % 2 != 0], r",", each['tag'])
-	    		self.__delimit__([entries[i] for i in xrange(len(entries)) if i % 2 == 0], r":", each['tag'])
-	    		# print([entries[i] for i in xrange(len(entries)) if i % 2 != 0])
-	    		# print([entries[i] for i in xrange(len(entries)) if i % 2 == 0])
+            if each['typed'] == 'mono1':
+                # Because all the mono1 tags are ended with ','
+                self.__delimit__(entries, r",", each['tag'])
+            elif each['typed'] == 'mono2':
+                # Because all the mono2 tags are ended with ':' and  ',' both
+                self.__delimit__([entries[i] for i in xrange(len(entries)) if i % 2 != 0], r",", each['tag'])
+                self.__delimit__([entries[i] for i in xrange(len(entries)) if i % 2 == 0], r":", each['tag'])
+                # print([entries[i] for i in xrange(len(entries)) if i % 2 != 0])
+                # print([entries[i] for i in xrange(len(entries)) if i % 2 == 0])
+            elif each['typed'] == 'multi':
+                toolkit = False
+                browser = False
+                framework = False
+                if r'toolkit' in entries:
+                    toolkit = True
+                if r'browser' in entries:
+                    browser = True
+                if r'framework' in entries:
+                    framework = True
+                try:
+                    if not (toolkit and browser and framework):
+                        raise ValueError("Can not find all codelines in RUN_TEST")
+                except ValueError as what:
+                    err = "ValueError: %s" % str(what)
+                    err += r"....If you have provided all, please give space after them"
+                    print(err, file=sys.stderr)
+                    sys.exit()
 
-	def _final_checks(self):
-		pass
+                for each in entries:
+                    if each == r"[]":
+                        e = "Space is expected between braces in []"
+                        raise SyntaxError(e)
+                openBraceIndex = [i for i, x in enumerate(entries) if x == r"["]
+                closeBraceIndex = [i for i, x in enumerate(entries) if x == r"]"]
+                BraceIndex = zip(openBraceIndex, closeBraceIndex)
+                if len(openBraceIndex) > len(closeBraceIndex):
+                    e = "Extra/Unmatched '[' found in the RUN_TEST tag"
+                    raise SyntaxError(e)
+                elif len(openBraceIndex) < len(closeBraceIndex):
+                    e = "Extra/Unmatched ']' found in the RUN_TEST tag"
+                    raise SyntaxError(e)
+                if len(BraceIndex) > 3:
+                    e = "Unnecessary square braces found in RUN_TEST"
+                    raise SyntaxError(e)
+                if len(BraceIndex) < 3:
+                    e = "Not all codelines are surrounded by square braces in RUN_TEST"
+                    raise SyntaxError(e)
+                # toolkitIndex = entries.index(r'toolkit')
+
+                # temp = ['toolkit', 'browser', 'framework']
+                # temp.remove(entries[BraceIndex[0][0] - 1])
+                _Batches = {'toolkitBatches': None, 'frameworkBatches': None, 'browserBatches': None}
+                if self.allData['codeLine'] == 'toolkit':
+                    if entries[BraceIndex[0][0] - 1].lower() == r"toolkit":
+                        k = 0
+                    elif entries[BraceIndex[1][0] - 1].lower() == r"toolkit":
+                        k = 1
+                    elif entries[BraceIndex[2][0] - 1].lower() == r"toolkit":
+                        k = 2
+                    # print()
+                    # print("ToolKit Batches: ", end="")
+                    print("k = ", k)
+                    _Batches['toolkitBatches'] = entries[BraceIndex[k][0] + 1 : BraceIndex[k][1]]
+                    # print()
+                elif self.allData['codeLine'] == 'framework':
+                    if entries[BraceIndex[0][0] - 1].lower() == r"framework":
+                        k = 0
+                    elif entries[BraceIndex[1][0] - 1].lower() == r"framework":
+                        k = 1
+                    elif entries[BraceIndex[2][0] - 1].lower() == r"framework":
+                        k = 2
+                    # print()
+                    # print("FrameWork Batches: ", end="")
+                    _Batches['frameworkBatches'] = entries[BraceIndex[k][0] + 1 : BraceIndex[k][1]]
+                    # print()
+                elif self.allData['codeLine'] == 'browser':
+                    if entries[BraceIndex[0][0] - 1].lower() == r"browser":
+                        k = 0
+                    elif entries[BraceIndex[1][0] - 1].lower() == r"browser":
+                        k = 1
+                    elif entries[BraceIndex[2][0] - 1].lower() == r"browser":
+                        k = 2
+                    # print()
+                    # print("Browser Batches: ", end="")
+                    _Batches['browserBatches'] = entries[BraceIndex[k][0] + 1 : BraceIndex[k][1]]
+                    # print()
+                # print(Batches)
+                # for each in _Batches:
+                #     if _Batches[each] is not None:
+                #         temp = _Batches[each]
+                #         print(temp)
+                #         for i in xrange(len(temp)):
+                #             if i % 2 == 0 and temp[i][-1] != r":":
+                #                 e = "Expected : after %s" % str(temp[i])
+                #                 raise SyntaxError(e)
+                #         Batches = _Batches[each]
+                print(_Batches)
+
+
+    def _final_checks(self):
+        pass
 
     def _verify_syntax(self, check_list="All"):
         """
@@ -271,4 +371,4 @@ class Resolver(Grammar):
         Grammar.__init__(self, automateFile)
 
 if __name__ == '__main__':
-    rs = Resolver(r"sample.txt")
+    rs = Resolver(r"tester.txt")
