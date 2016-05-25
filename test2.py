@@ -1,5 +1,4 @@
-
-    __author__ = 'Mayukh Sarkar'
+__author__ = 'Mayukh Sarkar'
 __email__ = 'mayukh.sarkar@morpho.com'
 import os
 import subprocess
