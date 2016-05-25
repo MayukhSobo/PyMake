@@ -3,6 +3,7 @@ import sys
 from abc import ABCMeta
 import re
 from pyparsing import Word, alphas, Literal
+import os
 # import pyparsing
 # import string
 
@@ -27,6 +28,15 @@ class Grammar(object):
     __metaclass__ = ABCMeta
 
     def __init__(self, automateFile=None):
+
+        if automateFile is None:
+            print("Cannot resolve the path for the automate file", file=sys.stderr)
+            sys.exit()
+
+        if not automateFile.lower().endswith('automate'):
+            print("Invalid automate file", file=sys.stderr)
+            sys.exit()
+
         with open(automateFile, 'r') as af:
             self.data = af.read()
         self.mTags = [{'tag': 'proto', 'typed': 'mono1'}, {'tag': 'workspace', 'typed': 'null'}, {'tag': 'project', 'typed': 'null'}]
@@ -34,7 +44,7 @@ class Grammar(object):
         self.rmTag = [{'tag': 'codeline', 'typed': 'null'}]
         self.aTags = self.mTags + self.rmTag + self.oTags
         # print(self.aTags)
-        self.allData = {
+        self._allData = {
                     'proto': [],
                     'codeline': None,
                     'workspace': None,
@@ -155,8 +165,8 @@ class Grammar(object):
         entries = None
 
         if typed == "null":
-            regex = tag + r'\s*:\s*(\w+)'
-            self.allData[tag] = re.findall(regex, self.data, re.IGNORECASE)[0]
+            regex = tag + r'\s*:\s*(.*)'
+            self._allData[tag] = re.findall(regex, self.data, re.IGNORECASE)[0]
 
         elif typed == "mono1" or typed == "mono2":
             regex = tag + r"\s*\{(?:\n*\s*(.*?))\}"
@@ -239,9 +249,9 @@ class Grammar(object):
             sys.exit()
         else:
             if delimit == ",":
-                self.allData['summary'] = [each.split()[0].split(delimit)[0] for each in entries]
+                self._allData['summary'] = [each.split()[0].split(delimit)[0] for each in entries]
             if tag == "proto":
-                self.allData['proto'] = [each.split()[0].split(delimit)[0] for each in entries]
+                self._allData['proto'] = [each.split()[0].split(delimit)[0] for each in entries]
 
     def _delimit(self):
         for each in self.aTags:
@@ -303,7 +313,7 @@ class Grammar(object):
                 # temp = ['toolkit', 'browser', 'framework']
                 # temp.remove(entries[BraceIndex[0][0] - 1])
                 _Batches = {'toolkitBatches': None, 'frameworkBatches': None, 'browserBatches': None}
-                if self.allData['codeline'] == 'toolkit':
+                if self._allData['codeline'] == 'toolkit':
                     if entries[BraceIndex[0][0] - 1].lower() == r"toolkit":
                         k = 0
                     elif entries[BraceIndex[1][0] - 1].lower() == r"toolkit":
@@ -315,7 +325,7 @@ class Grammar(object):
                     # print("k = ", k)
                     _Batches['toolkitBatches'] = entries[BraceIndex[k][0] + 1: BraceIndex[k][1]]
                     # print()
-                elif self.allData['codeline'] == 'framework':
+                elif self._allData['codeline'] == 'framework':
                     if entries[BraceIndex[0][0] - 1].lower() == r"framework":
                         k = 0
                     elif entries[BraceIndex[1][0] - 1].lower() == r"framework":
@@ -326,7 +336,7 @@ class Grammar(object):
                     # print("FrameWork Batches: ", end="")
                     _Batches['frameworkBatches'] = entries[BraceIndex[k][0] + 1: BraceIndex[k][1]]
                     # print()
-                elif self.allData['codeline'] == 'browser':
+                elif self._allData['codeline'] == 'browser':
                     if entries[BraceIndex[0][0] - 1].lower() == r"browser":
                         k = 0
                     elif entries[BraceIndex[1][0] - 1].lower() == r"browser":
@@ -347,8 +357,8 @@ class Grammar(object):
                 #                 e = "Expected : after %s" % str(temp[i])
                 #                 raise SyntaxError(e)
                 #         Batches = _Batches[each]
-                # print(self.allData)
-                s = _Batches[self.allData['codeline'] + "Batches"]
+                # print(self._allData)
+                s = _Batches[self._allData['codeline'] + "Batches"]
                 _batches = "".join(s)
                 # print(_batches)
                 # _batches = "batch1:(!product5)"
@@ -357,18 +367,20 @@ class Grammar(object):
                 comma = ","
                 no = "!"
                 every = "*"
+                underscore = "_"
+                dash = "-"
 
-                batchName = Word(alphas + digits)
+                batchName = Word(alphas + digits + underscore)
                 colons = Literal(":")
                 openBrace = Literal("(")
-                entries = Word(alphas + comma + no + every + digits)
+                entries = Word(alphas + comma + no + every + digits + underscore + dash)
                 closeBrace = Literal(")")
                 batchEntry = batchName + colons + openBrace + entries + closeBrace
 
                 rs = len(_batches)
                 while rs > 0:
                     k = batchEntry.parseString(_batches)
-                    self.allData['batches'][k[0]] = k[3].split(r",")
+                    self._allData['batches'][k[0]] = k[3].split(r",")
                     m = len("".join(k))
                     rs -= m
                     _batches = _batches[m::]
@@ -398,13 +410,104 @@ class Grammar(object):
             self._braced()
             self._unique()
             self._delimit()
-            for each in self.allData:
-                print(each, self.allData[each])
+
+    @staticmethod
+    def get_raw_data(self):
+        return self._allData
 
 
 class Resolver(Grammar):
     def __init__(self, automateFile=None):
         Grammar.__init__(self, automateFile)
+        self.allData = Grammar.get_raw_data(self)
+        self.protos = []
+        self.test = None
+        self.workspace = None
+        self.project = None
+        self.summary = []
+        self.batch = {}
+
+    def verify_protos(self):
+        self.protos = self.allData['proto']
+        return True
+
+    def verify_workspace(self):
+        self.workspace = self.allData['workspace']
+        return os.path.exists(self.allData['workspace'])
+
+    def verify_project(self):
+        self.project = self.allData['project']
+        return os.path.exists(os.path.join(self.allData['workspace'], 'source', self.allData['project']))
+
+    def verify_summary(self):
+        # print(self.allData['summary'])
+        self.summary.append(self.allData['summary'][0].lower())
+
+        if self.summary[0] == "yes":
+            try:
+                self.summary.append(self.allData['summary'][1])
+                if not os.path.exists(self.summary[1]):
+                    self.summary[1] = os.path.join(os.path.dirname(os.path.abspath(__file__)), self.summary[1])
+                    return os.path.exists(self.summary[1])
+            except IndexError:
+                return False
+        return True
+
+    def resolve_batches(self):
+        self.test = "yes"
+        if not self.allData['batches']:
+            self.test = "no"
+        else:
+            var = False
+            for each in self.allData['batches']:
+                if self.allData['batches'][each] == ['!*']:
+                    m = False
+                    self.batch[each] = None
+                else:
+                    m = True
+
+                    if len(self.allData['batches'][each]) > 1:
+                        self.batch[each] = self.allData['batches'][each]
+                    else:
+                        if self.allData['batches'][each] == ['*']:
+                            self.batch[each] = self.allData['proto']
+                        else:
+                            blklst = self.allData['batches'][each][0][1::]
+                            prts = self.allData['proto'][:]
+                            prts.remove(blklst)
+                            self.batch[each] = prts
+                var = var or m
+            if not var:
+                self.test = "no"
+
+        # pass
 
 if __name__ == '__main__':
-    rs = Resolver(r"sample.txt")
+    try:
+        rs = Resolver(r"tester.automate")
+        if not rs.verify_workspace():
+            e = "Can not resolve the workspace"
+            raise ValueError(e)
+        if not rs.verify_project():
+            e = "Can not resolve the project in the workspace"
+            raise ValueError(e)
+        if not rs.verify_summary():
+            e = "Path for summary is either none or invalid"
+            raise ValueError(e)
+    except ValueError as what:
+        err = "ValueError: %s" % str(what)
+        print(err, file=sys.stderr)
+        sys.exit()
+    except IOError:
+        err = "Can not access/open the .automate file"
+        print(err, file=sys.stderr)
+        sys.exit()
+    rs.verify_protos()
+    rs.resolve_batches()
+    print("Batches", rs.batch)
+    print("test", rs.test)
+    print("Summary", rs.summary)
+    print("Workspace", rs.workspace)
+    print("Project", rs.project)
+    print("Protos", rs.protos)
+
