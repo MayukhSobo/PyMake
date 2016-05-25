@@ -1,20 +1,36 @@
-import re
+PROTO {
+    SC3-00OS04_M2MDT_GP211_JC222_R6,
+    SC5-01OS01_GP211_JC302_LTE_TMO,
+    S65-85OS04_M2M_GP211_JC222_R6,
+    SC5-01OS18_GP221_JC302_LTE_SAT,
+    SC5-01OS19_GP221_JC302_LTE_MTN,
+}
 
-s = ['batch1', ':', '(!', 'product3', ')', 'batch2', ':', '(product1', ',', 'product4', ',', 'product5', ')']
-s = "".join(s)
-print s
-# batch1:(!product3)batch2:(product1,product4,product5)
-# {'batch1': ['!product3'], 'batch2': ['product1', 'product4', 'product5']}
-# print re.findall(r'(.*?)\:', s)
-openBraceIndex = [i for i, x in enumerate(s) if x == r"("]
-closeBraceIndex = [i for i, x in enumerate(s) if x == r")"]
-print openBraceIndex
-print closeBraceIndex
+CODELINE: toolkit
 
-if len(openBraceIndex) != len(closeBraceIndex):
-    err = "PROTO names are not enclosed within () in RUN_TEST"
-    raise SyntaxError(err)
-BraceIndex = zip(openBraceIndex, closeBraceIndex)
-for each in BraceIndex:
-    temp = s[each[0] + 1: each[1]]
-    print temp
+RUN_TEST {
+  toolkit
+  [
+        Toolkit_CompleteBatch: (!*)
+        Toolkit_etsi: (!*)
+        sat: (!S65-85OS04_M2M_GP211_JC222_R6)
+        wib: (SC5-01OS01_GP211_JC302_LTE_TMO, S65-85OS04_M2M_GP211_JC222_R6)
+      ]
+  browser [
+         wib: (SC5-01OS01_GP211_JC302_LTE_TMO, S65-85OS04_M2M_GP211_JC222_R6)
+         sat: (!*)
+      ]
+
+  framework [
+
+  ]
+
+}
+
+SUMMARY {
+    option: yes,
+    path: D:\morphoeclipse,
+}
+
+WORKSPACE: D:\p4v\ssimbiOS_2_9
+PROJECT: SIMbiOS_2_9
