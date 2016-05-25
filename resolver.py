@@ -2,7 +2,9 @@ from __future__ import print_function
 import sys
 from abc import ABCMeta
 import re
-import string
+from pyparsing import Word, alphas, Literal
+# import pyparsing
+# import string
 
 
 class Grammar(object):
@@ -30,13 +32,15 @@ class Grammar(object):
         self.mTags = [{'tag': 'proto', 'typed': 'mono1'}, {'tag': 'workspace', 'typed': 'null'}, {'tag': 'project', 'typed': 'null'}]
         self.oTags = [{'tag': 'run_test', 'typed': 'multi'}, {'tag': 'summary', 'typed': 'mono2'}]
         self.rmTag = [{'tag': 'codeline', 'typed': 'null'}]
-        self.aTags = self.mTags + self.oTags + self.rmTag
+        self.aTags = self.mTags + self.rmTag + self.oTags
+        # print(self.aTags)
         self.allData = {
                     'proto': [],
-                    'codeLine': 'framework',
+                    'codeline': None,
                     'workspace': None,
                     'project': None,
                     'summary': [],
+                    'batches': {}
         }
         # self.aTags = self.uTags
         self._verify_syntax()
@@ -151,7 +155,9 @@ class Grammar(object):
         entries = None
 
         if typed == "null":
-            pass
+            regex = tag + r'\s*:\s*(\w+)'
+            self.allData[tag] = re.findall(regex, self.data, re.IGNORECASE)[0]
+
         elif typed == "mono1" or typed == "mono2":
             regex = tag + r"\s*\{(?:\n*\s*(.*?))\}"
             match = re.findall(regex, self.data, re.DOTALL | re.IGNORECASE)
@@ -163,11 +169,11 @@ class Grammar(object):
             for i in xrange(len(entries)):
                 try:
                     if not entries[i].endswith(r",") and entries[i + 1] == r",":
-                      entries.pop(i + 1)
-                      entries[i] += r","
+                        entries.pop(i + 1)
+                        entries[i] += r","
                     if not entries[i].endswith(r":") and entries[i + 1] == r":":
-                      entries.pop(i + 1)
-                      entries[i] += r":"
+                        entries.pop(i + 1)
+                        entries[i] += r":"
                     # if entries[i][-1] not in string.punctuation and entries[i + 1][-1] in string.punctuation:
                     #     t = entries.pop(i + 1)
                     #     entries[i] += t
@@ -232,7 +238,10 @@ class Grammar(object):
             print(err, file=sys.stderr)
             sys.exit()
         else:
-            print([each.split()[0].split(delimit)[0] for each in entries])
+            if delimit == ",":
+                self.allData['summary'] = [each.split()[0].split(delimit)[0] for each in entries]
+            if tag == "proto":
+                self.allData['proto'] = [each.split()[0].split(delimit)[0] for each in entries]
 
     def _delimit(self):
         for each in self.aTags:
@@ -294,7 +303,7 @@ class Grammar(object):
                 # temp = ['toolkit', 'browser', 'framework']
                 # temp.remove(entries[BraceIndex[0][0] - 1])
                 _Batches = {'toolkitBatches': None, 'frameworkBatches': None, 'browserBatches': None}
-                if self.allData['codeLine'] == 'toolkit':
+                if self.allData['codeline'] == 'toolkit':
                     if entries[BraceIndex[0][0] - 1].lower() == r"toolkit":
                         k = 0
                     elif entries[BraceIndex[1][0] - 1].lower() == r"toolkit":
@@ -303,10 +312,10 @@ class Grammar(object):
                         k = 2
                     # print()
                     # print("ToolKit Batches: ", end="")
-                    print("k = ", k)
-                    _Batches['toolkitBatches'] = entries[BraceIndex[k][0] + 1 : BraceIndex[k][1]]
+                    # print("k = ", k)
+                    _Batches['toolkitBatches'] = entries[BraceIndex[k][0] + 1: BraceIndex[k][1]]
                     # print()
-                elif self.allData['codeLine'] == 'framework':
+                elif self.allData['codeline'] == 'framework':
                     if entries[BraceIndex[0][0] - 1].lower() == r"framework":
                         k = 0
                     elif entries[BraceIndex[1][0] - 1].lower() == r"framework":
@@ -315,9 +324,9 @@ class Grammar(object):
                         k = 2
                     # print()
                     # print("FrameWork Batches: ", end="")
-                    _Batches['frameworkBatches'] = entries[BraceIndex[k][0] + 1 : BraceIndex[k][1]]
+                    _Batches['frameworkBatches'] = entries[BraceIndex[k][0] + 1: BraceIndex[k][1]]
                     # print()
-                elif self.allData['codeLine'] == 'browser':
+                elif self.allData['codeline'] == 'browser':
                     if entries[BraceIndex[0][0] - 1].lower() == r"browser":
                         k = 0
                     elif entries[BraceIndex[1][0] - 1].lower() == r"browser":
@@ -326,7 +335,7 @@ class Grammar(object):
                         k = 2
                     # print()
                     # print("Browser Batches: ", end="")
-                    _Batches['browserBatches'] = entries[BraceIndex[k][0] + 1 : BraceIndex[k][1]]
+                    _Batches['browserBatches'] = entries[BraceIndex[k][0] + 1: BraceIndex[k][1]]
                     # print()
                 # print(Batches)
                 # for each in _Batches:
@@ -338,8 +347,33 @@ class Grammar(object):
                 #                 e = "Expected : after %s" % str(temp[i])
                 #                 raise SyntaxError(e)
                 #         Batches = _Batches[each]
-                print(_Batches)
+                # print(self.allData)
+                s = _Batches[self.allData['codeline'] + "Batches"]
+                _batches = "".join(s)
+                # print(_batches)
+                # _batches = "batch1:(!product5)"
+                # print(_batches)
+                digits = "0123456789"
+                comma = ","
+                no = "!"
+                every = "*"
 
+                batchName = Word(alphas + digits)
+                colons = Literal(":")
+                openBrace = Literal("(")
+                entries = Word(alphas + comma + no + every + digits)
+                closeBrace = Literal(")")
+                batchEntry = batchName + colons + openBrace + entries + closeBrace
+
+                rs = len(_batches)
+                while rs > 0:
+                    k = batchEntry.parseString(_batches)
+                    self.allData['batches'][k[0]] = k[3].split(r",")
+                    m = len("".join(k))
+                    rs -= m
+                    _batches = _batches[m::]
+            elif each['typed'] == 'null':
+                pass
 
     def _final_checks(self):
         pass
@@ -364,6 +398,8 @@ class Grammar(object):
             self._braced()
             self._unique()
             self._delimit()
+            for each in self.allData:
+                print(each, self.allData[each])
 
 
 class Resolver(Grammar):
@@ -371,4 +407,4 @@ class Resolver(Grammar):
         Grammar.__init__(self, automateFile)
 
 if __name__ == '__main__':
-    rs = Resolver(r"tester.txt")
+    rs = Resolver(r"sample.txt")
